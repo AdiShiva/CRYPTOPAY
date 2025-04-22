@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Payment Gateway</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .dark-mode {
+            background-color: #1a202c;
+            color: #f7fafc;
+        }
+        .dark-mode .bg-white {
+            background-color: #2d3748;
+        }
+        .dark-mode .text-gray-700 {
+            color: #e2e8f0;
+        }
+        .dark-mode .border {
+            border-color: #4a5568;
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .crypto-option {
+            transition: all 0.3s ease;
+        }
+        .crypto-option:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .currency-option {
+            transition: all 0.3s ease;
+        }
+        .currency-option:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .search-box {
+            transition: all 0.3s ease;
+        }
+        .search-box:focus {
+            transform: scale(1.02);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen transition-colors duration-300">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-bold text-blue-600">CryptoPay</h1>
+            <button id="darkModeToggle" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
+                <i class="fas fa-moon"></i>
+            </button>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Payment Form -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 animate-fade-in">
+                <h2 class="text-xl font-semibold mb-6">Create Payment</h2>
+                
+                <div class="mb-4">
+                    <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2" for="amount">
+                        Amount
+                    </label>
+                    <div class="relative">
+                        <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 dark:text-gray-300 leading-tight focus:outline-none focus:shadow-outline dark:bg-gray-700"
+                               id="amount" type="number" step="0.01" placeholder="Enter amount">
+                        <div class="absolute right-3 top-2">
+                            <select class="bg-transparent text-gray-500 dark:text-gray-400" id="currency">
+                                <!-- Currency options will be populated by JavaScript -->
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">
+                        Search Currency
+                    </label>
+                    <input type="text" id="currencySearch" 
+                           class="search-box shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 dark:text-gray-300 leading-tight focus:outline-none focus:shadow-outline dark:bg-gray-700"
+                           placeholder="Search for a currency...">
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">
+                        Select Cryptocurrency
+                    </label>
+                    <div class="grid grid-cols-2 gap-4" id="cryptoOptions">
+                        <!-- Crypto options will be populated by JavaScript -->
+                    </div>
+                </div>
+
+                <button id="generatePayment" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg focus:outline-none focus:shadow-outline transition duration-300">
+                    Generate Payment QR
+                </button>
+
+                <div id="paymentSection" class="hidden mt-6 animate-fade-in">
+                    <div class="text-center">
+                        <h3 class="text-lg font-semibold mb-4">Scan QR Code to Pay</h3>
+                        <div id="qrCode" class="mx-auto p-4 bg-white rounded-lg"></div>
+                        <div class="mt-4">
+                            <a id="paymentLink" href="#" target="_blank" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
+                                <i class="fas fa-external-link-alt mr-2"></i>Pay in Browser
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="errorMessage" class="hidden text-red-500 text-center mt-4"></div>
+            </div>
+
+            <!-- Payment History and Stats -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 animate-fade-in">
+                <h2 class="text-xl font-semibold mb-6">Payment History</h2>
+                <div class="mb-6">
+                    <canvas id="paymentChart"></canvas>
+                </div>
+                <div id="paymentHistory" class="space-y-4">
+                    <!-- Payment history will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Dark mode toggle
+        const darkModeToggle = document.getElementById('darkModeToggle');
+        const body = document.body;
+        const icon = darkModeToggle.querySelector('i');
+
+        darkModeToggle.addEventListener('click', () => {
+            body.classList.toggle('dark-mode');
+            icon.classList.toggle('fa-moon');
+            icon.classList.toggle('fa-sun');
+        });
+
+        // Load currencies and cryptos
+        let currencies = {};
+        let cryptos = {};
+
+        async function loadCurrencies() {
+            try {
+                const response = await fetch('/get_currencies');
+                const data = await response.json();
+                if (data.success) {
+                    currencies = data.currencies;
+                    cryptos = data.cryptos;
+                    populateCurrencyOptions();
+                    populateCryptoOptions();
+                }
+            } catch (error) {
+                console.error('Error loading currencies:', error);
+            }
+        }
+
+        function populateCurrencyOptions() {
+            const currencySelect = document.getElementById('currency');
+            currencySelect.innerHTML = '';
+            
+            Object.entries(currencies).forEach(([code, info]) => {
+                const option = document.createElement('option');
+                option.value = code;
+                option.textContent = `${info.symbol} ${code} - ${info.name}`;
+                currencySelect.appendChild(option);
+            });
+        }
+
+        function populateCryptoOptions() {
+            const cryptoOptionsContainer = document.getElementById('cryptoOptions');
+            cryptoOptionsContainer.innerHTML = '';
+            
+            Object.entries(cryptos).forEach(([code, info]) => {
+                const option = document.createElement('div');
+                option.className = 'crypto-option p-4 border rounded-lg cursor-pointer text-center';
+                option.innerHTML = `
+                    <i class="${info.symbol} text-2xl mb-2"></i>
+                    <div class="font-semibold">${info.name}</div>
+                    <div class="text-sm text-gray-500 dark:text-gray-400">${code}</div>
+                `;
+                option.addEventListener('click', () => {
+                    document.querySelectorAll('.crypto-option').forEach(opt => opt.classList.remove('bg-blue-100', 'dark:bg-blue-900'));
+                    option.classList.add('bg-blue-100', 'dark:bg-blue-900');
+                });
+                cryptoOptionsContainer.appendChild(option);
+            });
+        }
+
+        // Currency search functionality
+        const currencySearch = document.getElementById('currencySearch');
+        currencySearch.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            const currencySelect = document.getElementById('currency');
+            const options = currencySelect.getElementsByTagName('option');
+            
+            for (let option of options) {
+                const text = option.textContent.toLowerCase();
+                option.style.display = text.includes(searchTerm) ? '' : 'none';
+            }
+        });
+
+        // Payment chart
+        const ctx = document.getElementById('paymentChart').getContext('2d');
+        const paymentChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                datasets: [{
+                    label: 'Payments',
+                    data: [12, 19, 3, 5, 2, 3],
+                    borderColor: 'rgb(59, 130, 246)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+
+        // Payment generation
+        document.getElementById('generatePayment').addEventListener('click', async () => {
+            const amount = document.getElementById('amount').value;
+            const currency = document.getElementById('currency').value;
+            const errorMessage = document.getElementById('errorMessage');
+            const paymentSection = document.getElementById('paymentSection');
+
+            if (!amount) {
+                errorMessage.textContent = 'Please enter an amount';
+                errorMessage.classList.remove('hidden');
+                paymentSection.classList.add('hidden');
+                return;
+            }
+
+            try {
+                const response = await fetch('/create_payment', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ amount, currency }),
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Generate QR code
+                    const qrCodeDiv = document.getElementById('qrCode');
+                    qrCodeDiv.innerHTML = '';
+                    QRCode.toCanvas(qrCodeDiv, data.payment_url, {
+                        width: 200,
+                        height: 200,
+                        margin: 1,
+                        color: {
+                            dark: '#000000',
+                            light: '#ffffff'
+                        }
+                    });
+
+                    // Set payment link
+                    document.getElementById('paymentLink').href = data.payment_url;
+
+                    // Show payment section
+                    paymentSection.classList.remove('hidden');
+                    errorMessage.classList.add('hidden');
+
+                    // Add to payment history
+                    const paymentHistory = document.getElementById('paymentHistory');
+                    const paymentEntry = document.createElement('div');
+                    paymentEntry.className = 'p-4 border rounded-lg';
+                    paymentEntry.innerHTML = `
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <span class="font-semibold">${amount} ${currencies[currency].symbol}</span>
+                                <span class="text-gray-500 dark:text-gray-400 text-sm ml-2">${new Date().toLocaleString()}</span>
+                            </div>
+                            <span class="text-green-500">Pending</span>
+                        </div>
+                    `;
+                    paymentHistory.insertBefore(paymentEntry, paymentHistory.firstChild);
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                errorMessage.textContent = 'Error generating payment: ' + error.message;
+                errorMessage.classList.remove('hidden');
+                paymentSection.classList.add('hidden');
+            }
+        });
+
+        // Load currencies on page load
+        loadCurrencies();
+    </script>
+</body>
+</html>
